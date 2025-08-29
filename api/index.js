@@ -1,93 +1,70 @@
-// api/index.js
-import express from 'express';
-import mongoose from 'mongoose';
-import cookieParser from 'cookie-parser';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import http from 'http';
-import { Server } from 'socket.io';
+import express from 'express'
+import cors from 'cors'
+import cookieParser from 'cookie-parser'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
+import mongoose from 'mongoose'
 
-// ==== Routes ====
-import userRoute from './routes/user.route.js';
-import authRoute from './routes/auth.route.js';
-import listingRoute from './routes/listing.router.js';
-import priceRoute from './routes/price.route.js';
-import newsletterRoute from './routes/newsletter.route.js';
-import chatRoute from './routes/chat.route.js';
-import adminRoute from './routes/admin.route.js';
+dotenv.config()
 
-// ==== Utils ====
-import { errorHandler } from './utils/error.js';
+const app = express()
+const PORT = process.env.PORT || 10000
 
-// ==== ENV ====
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+// ===== Middlewares chung =====
+app.use(express.json())
+app.use(cookieParser())
 
-// ==== App / Server ====
-const app = express();
-const server = http.createServer(app);
-
-// ==== CORS (đa origin qua ENV) ====
-// VD: CORS_ORIGINS="https://your-pages.pages.dev,https://yourdomain.com"
-const allowOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
-
-app.use(cors({ origin: allowOrigins, credentials: true }));
-app.use(express.json());
-app.use(cookieParser());
-
-// ==== MongoDB ====
-const MONGO = process.env.MONGO;
-if (!MONGO) {
-  console.warn('⚠️  Missing MONGO env in api/.env');
-}
-mongoose
-  .connect(MONGO, { dbName: process.env.DB_NAME || undefined })
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch((err) => console.error('❌ MongoDB error:', err.message));
-
-// ==== Socket.IO ====
-const io = new Server(server, {
-  cors: {
-    origin: allowOrigins,
-    methods: ['GET', 'POST'],
+// ===== CORS (có thể bỏ hẳn vì FE & BE cùng origin) =====
+const allowAll = !process.env.CORS_ORIGINS || process.env.CORS_ORIGINS === '*'
+const corsOrigins = allowAll
+  ? true
+  : process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+app.use(
+  cors({
+    origin: corsOrigins,
     credentials: true,
-  },
-});
-io.on('connection', (socket) => {
-  console.log('🔌 socket connected:', socket.id);
-  socket.on('disconnect', () => console.log('🔌 socket disconnected:', socket.id));
-  // TODO: đăng ký các event chat của bạn ở đây nếu cần
-});
+  }),
+)
 
-// ==== Routes ====
-app.use('/api/newsletter', newsletterRoute);
-app.use('/api/user', userRoute);
-app.use('/api/auth', authRoute);
-app.use('/api/listing', listingRoute);
-app.use('/api/price', priceRoute);
-app.use('/api/chat', chatRoute);
-app.use('/api/admin', adminRoute);
+// ===== DB (nếu dùng) =====
+if (process.env.MONGO) {
+  mongoose
+    .connect(process.env.MONGO)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.error('❌ MongoDB error:', err.message))
+}
 
-// ==== Health check ====
+// ===== Healthcheck =====
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, env: process.env.NODE_ENV || 'dev', uptime: process.uptime() });
-});
+  res.json({ ok: true, ts: new Date().toISOString() })
+})
 
-// ==== Global error handler ====
-app.use((err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
-  res.status(statusCode).json({ success: false, statusCode, message });
-});
+// ===== Routers API của bạn =====
+// Đổi các đường dẫn dưới cho đúng dự án của bạn:
+try {
+  const { default: authRouter } = await import('./routes/auth.route.js')
+  app.use('/api/auth', authRouter)
+} catch {}
 
-// ==== Start ====
-const PORT = Number(process.env.PORT) || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-});
+try {
+  const { default: priceRouter } = await import('./routes/price.route.js')
+  app.use('/api/price', priceRouter)
+} catch {}
+
+// ===== Serve FE build (copy vào ./public khi build) =====
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const feDir = path.join(__dirname, 'public')
+
+app.use(express.static(feDir)) // phục vụ static từ ./public
+
+// SPA fallback: mọi route KHÔNG bắt đầu bằng /api trả về index.html
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(feDir, 'index.html'))
+})
+
+// ===== Start =====
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`)
+})

@@ -19,22 +19,20 @@ export default function Signin() {
     try {
       dispatch(signInStart());
 
-      const res = await fetch(`${import.meta.env.VITE_API_BASE}/auth/signin`, {
+      const res = await fetch(`/api/auth/signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // quan trọng để cookie JWT đi cùng
+        credentials: 'include', // cookie JWT
         body: JSON.stringify(formData),
       });
-
       const data = await res.json();
+
       if (data?.success === false) {
         dispatch(signInFailure(data.message || 'Đăng nhập thất bại'));
         return;
       }
-
       dispatch(signInSuccess(data));
       navigate('/');
-      // toast.success('Đăng nhập thành công');
     } catch (err) {
       dispatch(signInFailure(err?.message || 'Đăng nhập thất bại'));
     }
@@ -44,35 +42,17 @@ export default function Signin() {
     <div className="p-3 max-w-lg mx-auto">
       <h1 className="text-3xl font-semibold text-center my-7">Đăng nhập</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          className="border p-3 rounded-lg"
-          onChange={handleChange}
-          required
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          className="border p-3 rounded-lg"
-          onChange={handleChange}
-          required
-        />
+        <input type="email" name="email" placeholder="Email" className="border p-3 rounded-lg" onChange={handleChange} required />
+        <input type="password" name="password" placeholder="Password" className="border p-3 rounded-lg" onChange={handleChange} required />
         <button disabled={loading} type="submit" className="uppercase bg-slate-700 text-white p-3 rounded-lg">
           {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </button>
         <OAuth />
       </form>
-
       <div className="flex gap-2 mt-5 justify-center">
         <p>Chưa có tài khoản?</p>
-        <Link to="/signup">
-          <span className="hover:underline">Đăng ký</span>
-        </Link>
+        <Link to="/signup"><span className="hover:underline">Đăng ký</span></Link>
       </div>
-
       {error && <p className="text-red-500 text-center mt-3">{error}</p>}
     </div>
   );
