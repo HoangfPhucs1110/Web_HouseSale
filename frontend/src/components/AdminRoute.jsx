@@ -1,5 +1,6 @@
 import { useSelector } from 'react-redux';
 import { Navigate, Outlet } from 'react-router-dom';
+import { socket } from '@/socket'
 
 export default function AdminRoute() {
   const { currentUser } = useSelector((s) => s.user);
