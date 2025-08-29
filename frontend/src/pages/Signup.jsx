@@ -1,52 +1,85 @@
-import { useState } from 'react'
-import api from '@/lib/api'
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Signup() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [ok, setOk] = useState(false)
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
-  const onSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setOk(false)
+  const handleChange = (e) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
     try {
-      // KHÔNG hash ở FE
-      await api.post('/auth/signup', { email, password, name })
-      setOk(true)
+      // KHÔNG dùng bcrypt ở FE, gửi plain password qua HTTPS
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (data?.success === false) {
+        setError(data.message || 'Đăng ký thất bại');
+        setLoading(false);
+        return;
+      }
+
+      // Đăng ký xong điều hướng sang trang đăng nhập
+      navigate('/signin');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Signup failed')
+      setError(err?.message || 'Đăng ký thất bại');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div style={{ maxWidth: 420, margin: '40px auto', fontFamily: 'system-ui' }}>
-      <h2>Sign up</h2>
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label>Name</label>
-          <input value={name} onChange={(e)=>setName(e.target.value)} required style={{ width:'100%' }}/>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>Email</label>
-          <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required style={{ width:'100%' }}/>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>Password</label>
-          <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required style={{ width:'100%' }}/>
-        </div>
-        <button disabled={loading} type="submit">
-          {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+    <div className="p-3 max-w-lg mx-auto">
+      <h1 className="text-3xl font-semibold text-center my-7">Đăng ký</h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <input
+          name="name"
+          placeholder="Họ tên"
+          className="border p-3 rounded-lg"
+          onChange={handleChange}
+          required
+        />
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          className="border p-3 rounded-lg"
+          onChange={handleChange}
+          required
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          className="border p-3 rounded-lg"
+          onChange={handleChange}
+          required
+        />
+        <button disabled={loading} className="uppercase bg-slate-700 text-white p-3 rounded-lg">
+          {loading ? 'Đang tạo...' : 'Tạo tài khoản'}
         </button>
       </form>
-      {ok && <p style={{ color:'green' }}>Tài khoản đã được tạo. Bạn có thể đăng nhập ngay bây giờ.</p>}
-      {error && <p style={{ color:'crimson' }}>{error}</p>}
+
+      <div className="flex gap-2 mt-5 justify-center">
+        <p>Đã có tài khoản?</p>
+        <Link to="/signin">
+          <span className="hover:underline">Đăng nhập</span>
+        </Link>
+      </div>
+
+      {error && <p className="text-red-500 text-center mt-3">{error}</p>}
     </div>
-  )
+  );
 }
