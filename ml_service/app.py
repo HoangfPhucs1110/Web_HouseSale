@@ -1,13 +1,14 @@
 # ml_service/app.py
-import os, requests
+import os
+import requests
+import joblib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import joblib
 
-# ----- CORS -----
-allow = os.getenv("ALLOW_ORIGINS", "*")
-origins = ["*"] if allow.strip() == "*" else [o.strip() for o in allow.split(",") if o.strip()]
+# ---------- CORS ----------
+allow = os.getenv("ALLOW_ORIGINS", "*").strip()
+origins = ["*"] if allow == "*" else [o.strip() for o in allow.split(",") if o.strip()]
 
 app = FastAPI(title="House Price Predictor")
 app.add_middleware(
@@ -18,27 +19,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----- Model -----
+# ---------- Model loader ----------
 MODEL_PATH = os.getenv("MODEL_PATH", "house_price_rf.joblib")
-MODEL_URL  = os.getenv("MODEL_URL")  # bắt buộc khi không bundle sẵn file
+MODEL_URL = os.getenv("MODEL_URL")  # BẮT BUỘC khi không bundle file model
 
 def ensure_model():
     if os.path.exists(MODEL_PATH):
         return
     if not MODEL_URL:
         raise RuntimeError("MODEL_URL chưa được cấu hình và MODEL_PATH không tồn tại.")
-    # tải file model
+    # Tải model theo stream để tiết kiệm RAM
     with requests.get(MODEL_URL, stream=True, timeout=300) as r:
         r.raise_for_status()
         with open(MODEL_PATH, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1<<20):
+            for chunk in r.iter_content(chunk_size=1 << 20):
                 if chunk:
                     f.write(chunk)
 
 ensure_model()
 model = joblib.load(MODEL_PATH)
 
-# ----- Schemas & API -----
+# ---------- Schemas ----------
 class HouseFeatures(BaseModel):
     bedrooms: float
     bathrooms: float
@@ -62,7 +63,14 @@ class HouseFeatures(BaseModel):
 class PredictIn(BaseModel):
     features: HouseFeatures
 
-@app.post("/predict")
+class PredictOut(BaseModel):
+    predicted_price: float
+
+@app.get("/schema")
+def schema():
+    return {"features": list(HouseFeatures.model_fields.keys())}
+
+@app.post("/predict", response_model=PredictOut)
 def predict(req: PredictIn):
     x = req.features
     ordered = [
