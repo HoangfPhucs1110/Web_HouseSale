@@ -32,16 +32,12 @@ console.log('✅ Connected to MongoDB');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: 'http://localhost:5173',
-    credentials: true,
-  },
-});
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || '*';
+const corsOrigin = CLIENT_ORIGIN === '*' ? true : CLIENT_ORIGIN;
 
+const io = new Server(server, { cors: { origin: corsOrigin, credentials: true } });
+app.use(cors({ origin: corsOrigin, credentials: true }));
 
-
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -52,6 +48,14 @@ app.use('/api/listing', listingRoute);
 app.use('/api/price', priceRoute);
 app.use('/api/chat', chatRoute);
 app.use('/api/admin', adminRoute);
+
+// Serve frontend build
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir));
+// Catch-all cho SPA, tránh đụng /api/*
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(publicDir, 'index.html'));
+});
 
 // Socket.IO log
 io.on('connection', (socket) => {

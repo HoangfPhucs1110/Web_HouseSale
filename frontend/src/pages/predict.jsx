@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 
 // Gọi thẳng FastAPI (đã bật CORS bên FastAPI)
-const PREDICT_URL = "http://localhost:8001/predict";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const PREDICT_URL = `${API_BASE}/price/predict`;
 
 const SectionTitle = ({ children }) => (
   <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">{children}</h3>
