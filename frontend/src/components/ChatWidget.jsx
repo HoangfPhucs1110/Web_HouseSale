@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
+import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-
+import { socket } from '@/socket'; // ✅ dùng socket dùng chung
 
 export default function ChatWidget({ listingId }) {
   const { currentUser } = useSelector((s) => s.user);
@@ -14,25 +13,18 @@ export default function ChatWidget({ listingId }) {
   const [seller, setSeller] = useState(null); // { id, username, email }
 
   const API_BASE = import.meta.env.VITE_API_BASE || '/api';
-  const socket = useMemo(
-    () =>
-      io(import.meta.env.VITE_SOCKET_ORIGIN || 'http://localhost:3000', {
-        withCredentials: true,
-      }),
-    []
-  );
-
   const boxRef = useRef(null);
 
-  // Identify user (để server gom theo user room, nhận thông báo inbox/new & pending)
+  // 🔌 Identify user để server join vào room cá nhân (inbox/new & pending)
   useEffect(() => {
-    const uid = me;
-    if (uid) socket.emit('identify', uid);
-  }, [socket, me]);
+    if (!me) return;
+    socket.emit('identify', me);
+  }, [me]);
 
-  // Mở widget -> tạo/lấy conversation + nạp lịch sử
+  // 📬 Mở widget -> tạo/lấy conversation + nạp lịch sử
   useEffect(() => {
     if (!open) return;
+
     (async () => {
       const r = await fetch(`${API_BASE}/chat/conversations`, {
         method: 'POST',
@@ -57,6 +49,8 @@ export default function ChatWidget({ listingId }) {
       });
       const d2 = await r2.json();
       setMessages(d2?.items || []);
+
+      // Join room realtime
       socket.emit('join', d.conversationId);
 
       // đánh dấu đã đọc toàn bộ tin nhắn đến
@@ -67,18 +61,18 @@ export default function ChatWidget({ listingId }) {
         body: JSON.stringify({ conversationId: d.conversationId }),
       });
     })();
-  }, [open]);
+  }, [open, API_BASE, listingId]);
 
-  // Realtime nhận tin mới trong cùng conversation
+  // 🔄 Realtime nhận tin mới trong cùng conversation
   useEffect(() => {
     function onNew({ conversationId: cid, message }) {
       if (cid === conversationId) setMessages((prev) => [...prev, message]);
     }
     socket.on('message:new', onNew);
     return () => socket.off('message:new', onNew);
-  }, [socket, conversationId]);
+  }, [conversationId]);
 
-  // Tự cuộn xuống cuối
+  // ⬇️ Tự cuộn xuống cuối
   useEffect(() => {
     if (!boxRef.current) return;
     boxRef.current.scrollTop = boxRef.current.scrollHeight;
@@ -94,7 +88,7 @@ export default function ChatWidget({ listingId }) {
     });
     const d = await r.json();
     if (d?.message) {
-      // push local; server sẽ phát cho người còn lại (không bị nhân đôi)
+      // Push local; server sẽ phát cho người còn lại (không bị nhân đôi)
       setMessages((prev) => [...prev, d.message]);
       socket.emit('message:send', { conversationId, message: d.message });
       setText('');
@@ -116,7 +110,10 @@ export default function ChatWidget({ listingId }) {
             Trao đổi với người bán
             {seller?.email ? (
               <div className="text-xs font-normal text-slate-500 mt-1">
-                Email: <a href={`mailto:${seller.email}`} className="underline">{seller.email}</a>
+                Email:{' '}
+                <a href={`mailto:${seller.email}`} className="underline">
+                  {seller.email}
+                </a>
               </div>
             ) : (
               <div className="text-xs font-normal text-slate-400 mt-1">

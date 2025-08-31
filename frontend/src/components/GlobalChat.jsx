@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
+// frontend/src/components/GlobalChat.jsx
+import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { socket } from '@/socket'; // ✅ dùng socket dùng chung, không hard-code localhost
 
 const fmtTime = (d) => new Date(d).toLocaleString();
 
@@ -9,13 +10,6 @@ export default function GlobalChat() {
   const me = currentUser?.rest?._id || currentUser?._id || null;
 
   const API = import.meta.env.VITE_API_BASE || '/api';
-  const socket = useMemo(
-    () =>
-      io(import.meta.env.VITE_SOCKET_ORIGIN || 'http://localhost:3000', {
-        withCredentials: true,
-      }),
-    []
-  );
 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('list'); // list | chat
@@ -30,12 +24,12 @@ export default function GlobalChat() {
   // Set chống trùng theo message._id
   const seenIdsRef = useRef(new Set());
 
-  // Identify user ngay khi đăng nhập
+  // 🔌 Identify user ngay khi đăng nhập
   useEffect(() => {
     if (me) socket.emit('identify', me);
-  }, [socket, me]);
+  }, [me]);
 
-  // Load danh sách hội thoại (chỉ các convo đã có tin nhắn) + badge chưa đọc
+  // 📥 Load danh sách hội thoại + badge chưa đọc
   async function loadInbox() {
     if (!me) return;
     const r1 = await fetch(`${API}/chat/conversations`, { credentials: 'include' });
@@ -56,9 +50,10 @@ export default function GlobalChat() {
   // Mở widget -> nạp inbox
   useEffect(() => {
     if (open) loadInbox();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Realtime: chỉ cập nhật danh sách/badge khi có inbox:new (KHÔNG thêm vào messages để tránh lặp)
+  // 🔔 Realtime: cập nhật danh sách/badge khi có inbox:new
   useEffect(() => {
     function onInbox({ conversationId, message }) {
       setConvos((prev) => {
@@ -86,32 +81,32 @@ export default function GlobalChat() {
         ...m,
         [conversationId]: (m[conversationId] || 0) + (active === conversationId ? 0 : 1),
       }));
-      // ⛔ KHÔNG chạm vào messages ở đây
     }
+
     socket.on('inbox:new', onInbox);
     return () => socket.off('inbox:new', onInbox);
-  }, [socket, active]);
+  }, [active]);
 
-  // Realtime: nhận tin nhắn thực của đoạn đang mở (message:new) + chống trùng
+  // 💬 Realtime: nhận tin nhắn thật của đoạn đang mở + chống trùng
   useEffect(() => {
     function onNew({ conversationId: cid, message }) {
       if (cid !== active) return;
       const id = String(message._id);
-      if (seenIdsRef.current.has(id)) return; // đã có -> bỏ qua
+      if (seenIdsRef.current.has(id)) return;
       seenIdsRef.current.add(id);
       setMessages((prev) => [...prev, message]);
     }
     socket.on('message:new', onNew);
     return () => socket.off('message:new', onNew);
-  }, [socket, active]);
+  }, [active]);
 
-  // Autoscroll
+  // ⬇️ Autoscroll
   useEffect(() => {
     if (!boxRef.current) return;
     boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [messages, tab]);
 
-  // Mở một hội thoại: join room + load lịch sử + reset seenIds + đánh dấu đã đọc
+  // ▶️ Mở một hội thoại
   async function openConversation(conversationId, peerFromList = null) {
     setActive(conversationId);
     setActivePeer(peerFromList || null);
@@ -122,7 +117,7 @@ export default function GlobalChat() {
     const d = await r.json();
     if (r.ok) {
       const items = d.items || [];
-      seenIdsRef.current = new Set(items.map((m) => String(m._id))); // reset dấu vết
+      seenIdsRef.current = new Set(items.map((m) => String(m._id)));
       setMessages(items);
     }
 
@@ -135,7 +130,7 @@ export default function GlobalChat() {
     setUnreadMap((m) => ({ ...m, [conversationId]: 0 }));
   }
 
-  // Cho phép trang chi tiết bắn sự kiện để mở chat theo listingId
+  // 📣 Cho phép trang chi tiết bắn sự kiện để mở chat theo listingId
   useEffect(() => {
     async function handler(e) {
       const listingId = e?.detail?.listingId;
@@ -156,19 +151,16 @@ export default function GlobalChat() {
         alert(d?.message || 'Không tạo được cuộc trò chuyện');
         return;
       }
-
-      // cập nhật người kia (seller) từ server (để hiển thị gmail trên header)
       if (d?.seller) setActivePeer({ email: d.seller.email, username: d.seller.username });
-
       await openConversation(d.conversationId);
-      // Sau khi mở xong, refresh inbox để có peer/email đầy đủ trong list
       loadInbox();
     }
     window.addEventListener('open-chat-with-listing', handler);
     return () => window.removeEventListener('open-chat-with-listing', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Gửi tin: push local 1 lần (đánh dấu chống trùng) + emit socket
+  // ✉️ Gửi tin
   async function send() {
     if (!text.trim() || !active) return;
     const r = await fetch(`${API}/chat/messages`, {
@@ -182,12 +174,12 @@ export default function GlobalChat() {
       const id = String(d.message._id);
       if (!seenIdsRef.current.has(id)) {
         seenIdsRef.current.add(id);
-        setMessages((prev) => [...prev, d.message]); // push local 1 lần
+        setMessages((prev) => [...prev, d.message]);
       }
       socket.emit('message:send', { conversationId: active, message: d.message });
       setText('');
 
-      // cập nhật preview danh sách + move lên đầu
+      // Cập nhật preview danh sách + move lên đầu
       setConvos((lst) => {
         const next = [...lst];
         const idx = next.findIndex((c) => c._id === active);
@@ -286,7 +278,7 @@ export default function GlobalChat() {
                 {headerPeer?.email || headerPeer?.username || 'Đoạn chat'}
               </div>
 
-              <div ref={boxRef} className="px-3 py-2 max-h-[360px] min-h-[240px] overflow-y-auto space-y-2">
+              <div ref={boxRef} className="px-3 py-2 max-h=[360px] min-h-[240px] overflow-y-auto space-y-2">
                 {messages.map((m) => {
                   const mine = me && String(m.sender) === String(me);
                   return (
