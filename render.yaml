@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: web-housesale
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: |
+      bash -lc '
+        set -e
+        corepack enable
+        npm ci
+        cd frontend && npm ci && npm run build
+        cd ../api && rm -rf public && mkdir -p public && cp -a ../frontend/dist/. public/
+      '
+    startCommand: bash -lc 'cd api && node index.js'
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # Các biến khác bạn add thủ công trong dashboard (khuyên dùng)
+    healthCheckPath: /api/health
