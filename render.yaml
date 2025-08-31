@@ -16,5 +16,4 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-      # Các biến khác bạn add thủ công trong dashboard (khuyên dùng)
     healthCheckPath: /api/health

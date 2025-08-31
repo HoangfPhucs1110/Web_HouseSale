@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useSelector } from 'react-redux';
 
+
 export default function ChatWidget({ listingId }) {
   const { currentUser } = useSelector((s) => s.user);
   const me = currentUser?.rest?._id || currentUser?._id || null;

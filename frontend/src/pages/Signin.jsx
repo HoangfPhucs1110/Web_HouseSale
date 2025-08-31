@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector  } from 'react-redux';
 import { signInStart, signInSuccess, signInFailure } from '../redux/userSlice.js';
 import OAuth from '../components/OAuth';
+import { auth, googleProvider } from "@/firebase";
 
 export default function Signin() {
   const [formData, setFormData] = useState({

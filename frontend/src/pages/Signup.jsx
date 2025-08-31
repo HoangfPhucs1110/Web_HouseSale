@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import OAuth from '../components/OAuth';
+import { auth, googleProvider } from "@/firebase";
+
 export default function Signup() {
   const [formData, setFormData] = useState({
 
